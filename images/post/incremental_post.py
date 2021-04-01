@@ -7,14 +7,12 @@ import re
 
 import time
 
-import numpy as np
-
 import random
 
 import logging  
 
 FORMAT = '%(asctime)-15s %(message)s'
-SOLR_BIN = "/opt/solr/bin/post"
+SOLR_BIN = "/opt/solr-8.8.1/bin/post"
 
 logging.basicConfig(filename='times.log',level=logging.INFO, format=FORMAT)
 
@@ -44,6 +42,8 @@ def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT):
 
     with open(COLLECTION_LIST) as f:
       COLLECTION_LIST = [COLLECTION_FILE.strip() for COLLECTION_FILE in f]
+
+    COLLECTION_LIST = sorted(COLLECTION_LIST)
 
     COLLECTION_FILE_I = 0
     indexed = osize
@@ -89,7 +89,7 @@ def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT):
     subprocess.run("{} -host {} -c {} {}".format(SOLR_BIN, SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
 
 
-if __name__ == "main":    
+if __name__ == "__main__":
     SOLR_HOST=sys.argv[1] #e.g. solr host to post documents
     SOLR_PORT=int(sys.argv[2]) #e.g. solr post
     SOLR_COLLECTION=sys.argv[3] #e.g. images: Solr collection name
