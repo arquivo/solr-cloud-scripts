@@ -4,8 +4,8 @@ import json
 
 PAGE_SIZE = 50000
 
-host = sys.args[1] #e.g. p44.arquivo.pt:8983
-domains = sys.args[2].split(",") #e.g. example.com,example.pt
+host = sys.argv[1] #e.g. p44.arquivo.pt:8983
+domains = sys.argv[2].split(",") #e.g. example.com,example.pt
 
 domain_filter = "pageHost:" + "%20OR%20pageHost:".join(domains).strip()
 

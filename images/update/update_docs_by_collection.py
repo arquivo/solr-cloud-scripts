@@ -4,8 +4,8 @@ import json
 
 PAGE_SIZE = 50000
 
-host = sys.args[1] #e.g. p44.arquivo.pt:8983
-collections_to_filter = sys.args[2].split(",") #e.g. EAWP31,EAWP33,EAWP34
+host = sys.argv[1] #e.g. p44.arquivo.pt:8983
+collections_to_filter = sys.argv[2].split(",") #e.g. EAWP31,EAWP33,EAWP34
 
 
 
