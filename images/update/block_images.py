@@ -71,14 +71,13 @@ check_api = args['check_api']
 check_solr = args['check_solr']
 update_solr = args['update_solr']
 
-# API doesn't support full URL search, only domain search. So for each URL we need to search for all the images of the same
-#     domain and check that none are blocked (for example, if example.com/image.jpg is blocked, we search all images from
-#     example.com and check that none of them is image.jpg)
-#     Since we have multiple block requests from the same domain, we aggregate the API requests by domain, to both avoid
-#     overloading the imagesearch API and also make the search several times faster. The stucture that keeps track of the
-#     domains and URLs is the dictionary api_domains
 api_domains = {}
 print_output_line = ""
+
+url_col = 0
+timestamp_col = 2
+from_col = 3
+to_col = 4
 
 if(check_solr):
 	print("", flush=True)
@@ -88,7 +87,7 @@ if(check_solr):
 for ind in df.index:
 
 	#build the filter for the url for solr
-	domain = sanitizeUrl(df[df.columns[0]][ind])
+	domain = sanitizeUrl(df[df.columns[url_col]][ind])
 	domain_base = domain.split('/')[0].split(':')[0]
 	domain_extra = domain.split('/',1)[1] if len(domain.split('/')) > 1 else "" 
 	domain_filter = "%20OR%20".join([
@@ -112,38 +111,38 @@ for ind in df.index:
 
 	query_filter = domain_filter
 	api_current_domain = [domain_base,False,False]
-	if(not pd.isnull(df[df.columns[1]][ind])):
-		# build solr and API filters for timestamp
+	if(not pd.isnull(df[df.columns[timestamp_col]][ind])):
+		#build solr and API filters for timestamp
 		#   It's not an exact match, itsearches for timestamps up to 1h
 		#   away from the requested timestamp
-		timestamp = int(df[df.columns[1]][ind])
+		timestamp = int(df[df.columns[timestamp_col]][ind])
 		timestamp_from = str(timestamp-10000) if (timestamp % 1000000) > 10000 else str(timestamp - (timestamp % 1000000))
 		timestamp_to = str(timestamp+10000) if (timestamp % 1000000) < 230000 else str(timestamp - (timestamp % 1000000) + 235959)
-		
+		#solr_date = timestampToSolrDate(timestamp)
 		range_from = timestampToSolrDate(timestamp_from)
 		range_to = timestampToSolrDate(timestamp_to)
-
 		timestamp_filter = "imgCrawlTimestamp:[{0} TO {1}]%20OR%20pageCrawlTimestamp:[{0} TO {1}]".format(range_from,range_to)
+		#timestamp_filter = "imgCrawlTimestamp:{0}%20OR%20pageCrawlTimestamp:{0}".format(solr_date)
 		query_filter = "({0})%20AND%20({1})".format(domain_filter,timestamp_filter)
-		
+		#api_request_query_params.append("from={0}".format(timestamp_from))
+		#api_request_query_params.append("to={0}".format(timestamp_to))
 		api_current_domain = [domain_base,timestamp_from,timestamp_to]
 
 		print_output_line = "{0} at timestamp {1}".format(print_output_line,timestamp)
 
 
-	elif((not pd.isnull(df[df.columns[2]][ind])) or (not pd.isnull(df[df.columns[3]][ind]))):
+	elif((not pd.isnull(df[df.columns[from_col]][ind])) or (not pd.isnull(df[df.columns[to_col]][ind]))):
 		#build solr and API filters for time range
-		range_from = "*" if pd.isnull(df[df.columns[2]][ind]) else timestampToSolrDate(int(df[df.columns[2]][ind]))
-		range_to =  "*" if pd.isnull(df[df.columns[3]][ind]) else timestampToSolrDate(int(df[df.columns[3]][ind]))
+		range_from = "*" if pd.isnull(df[df.columns[from_col]][ind]) else timestampToSolrDate(int(df[df.columns[from_col]][ind]))
+		range_to =  "*" if pd.isnull(df[df.columns[to_col]][ind]) else timestampToSolrDate(int(df[df.columns[to_col]][ind]))
 		range_filter = "imgCrawlTimestamp:[{0} TO {1}]%20OR%20pageCrawlTimestamp:[{0} TO {1}]".format(range_from,range_to)
 		query_filter = "({0})%20AND%20({1})".format(domain_filter,range_filter)
 
-		timestamp_from = sanitizeTimestamp('') if pd.isnull(df[df.columns[2]][ind]) else sanitizeTimestamp(int(df[df.columns[2]][ind]))
-		timestamp_to = datetime.now().strftime("%Y%m%d%H%M%S") if pd.isnull(df[df.columns[3]][ind]) else sanitizeTimestamp(int(df[df.columns[3]][ind]))
-
+		timestamp_from = sanitizeTimestamp('') if pd.isnull(df[df.columns[from_col]][ind]) else sanitizeTimestamp(int(df[df.columns[from_col]][ind]))
+		timestamp_to = datetime.now().strftime("%Y%m%d%H%M%S") if pd.isnull(df[df.columns[to_col]][ind]) else sanitizeTimestamp(int(df[df.columns[to_col]][ind]))
 		api_current_domain = [domain_base,timestamp_from,timestamp_to]
 		
-		print_output_line = "{0} from {1} to {2}".format(print_output_line, "*" if pd.isnull(df[df.columns[2]][ind]) else int(df[df.columns[2]][ind]), "*" if pd.isnull(df[df.columns[3]][ind]) else int(df[df.columns[3]][ind]))	
+		print_output_line = "{0} from {1} to {2}".format(print_output_line, "*" if pd.isnull(df[df.columns[from_col]][ind]) else int(df[df.columns[from_col]][ind]), "*" if pd.isnull(df[df.columns[to_col]][ind]) else int(df[df.columns[to_col]][ind]))	
 
 	query_filter_all = query_filter
 	query_filter = "({0})%20AND%20-blocked:1".format(query_filter)
@@ -213,10 +212,8 @@ if(check_api):
 		r = requests.get(api_base_query)
 		counts = r.json()["totalItems"]
 		if(counts > 0):
-			# first check that none of the block requests is blocking an entire domain. 
 			domains_extra = list(map(lambda domain:domain.split('/',1)[1] if len(domain.split('/')) > 1 else "",domains))
 			if(any(map(lambda domain_extra: len(domain_extra) == 0,domains_extra))):
-				# If we got here then we found results from a domain that should be blocked
 				print("    WARNING - Found {0} results for the following query: {1}".format(counts,api_base_query), flush=True)
 				print("    They should be blocked by one or more of the following rules:", flush=True)
 				print("        {0}".format(domains), flush=True)   
