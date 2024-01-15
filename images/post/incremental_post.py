@@ -86,7 +86,7 @@ def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT):
       COLLECTION_FILE_I += 1
     out.close()
     logging.info("POST,RUNNING,{}".format(tmp_file_len))
-    subprocess.run("{} -host {} -c {} {}".format(SOLR_BIN, SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
+    subprocess.run("{} -Dparams=overwrite=false -host {} -c {} {}".format(SOLR_BIN, SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
 
 
 if __name__ == "__main__":
