@@ -154,6 +154,7 @@ function processAdd(cmd) {
         doc.addField(field, ts)
       });
   }
+  cmd.overwrite = true
 }
 
 function processDelete(cmd) {
