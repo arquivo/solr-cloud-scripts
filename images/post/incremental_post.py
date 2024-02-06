@@ -72,7 +72,7 @@ def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT):
             if tmp_file_len == POST_LIMIT:
               out.close()
               logging.info("POST,RUNNING,{}".format(tmp_file_len))
-              subprocess.run("{} -host {} -c {} {}".format(SOLR_BIN, SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
+              subprocess.run("{} -Dparams=overwrite=false -host {} -c {} {}".format(SOLR_BIN, SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
               out = open(OUT_TMP, "w")
               tmp_file_len = 0
       #last file of the collection
@@ -80,7 +80,7 @@ def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT):
       if "part-r-00149" in COLLECTION_FILE:
         out.close()
         logging.info("POST,RUNNING,{}".format(tmp_file_len))
-        subprocess.run("{} -host {} -c {} {}".format(SOLR_BIN, SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
+        subprocess.run("{} -Dparams=overwrite=false -host {} -c {} {}".format(SOLR_BIN, SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
         out = open(OUT_TMP, "w")
         tmp_file_len = 0      
       COLLECTION_FILE_I += 1
