@@ -16,17 +16,44 @@ SOLR_BIN = "/opt/solr-8.8.1/bin/post"
 
 logging.basicConfig(filename='times.log',level=logging.INFO, format=FORMAT)
 
-
 POST_LIMIT=10000000
 URL_SPLIT_PATTERN = "[^\w\s\b]+";
-#
-# Usage:
-#    ./incremental_post.py p44.arquivo.pt 8983 images collections.txt
-#
-# Collections.txt has in each line the name of the collection to index
-#
-# Run inside a screen as this scirpt takes about 30-40 min per 10000000 documents posted
-#
+
+def usage():
+    print("""
+Usage:
+
+    python3.9 ./incremental_post.py SOLR_HOST SOLR_PORT SOLR_COLLECTION JSONL_LIST [OVERWRITE] 
+
+Description:
+
+    This script will post to Solr Cloud the results of the image indexing performed by hadoop. 
+    When trying to post an image that was already indexed and posted into solr by another crawl, the 
+    script will not overwrite previously indexed images. Instead, it will update the Solr document to 
+    show the metadata of the older image, but also include the newer image's collection in the 
+    collection list.
+    To force the script to overwrite previously indexed images, the OVERWRITE flag must be set. 
+    
+Recommendations:
+    - This script was made for python3.9, other versions of python were not tested and may or may not  
+    cause the script to fail.
+    - Before running the script, make sure this repository is on the latest version and that the 
+    latest configset has been uploaded to Solr Cloud. The script send_config_set.sh was created for  
+    this purpose.
+    - Run this script inside of a screen, as it may take multiple hours to complete.
+
+Parameters:
+
+    SOLR_HOST       - The server that hosts Solr Cloud (e.g.: p44.arquivo.pt)
+    SOLR_PORT       - The port that hosts Solr Cloud (e.g.: 8983)
+    SOLR_COLLECTION - The name of the Solr collection to be posted to (e.g.: images)
+    JSONL_LIST      - A text file containing the paths to the .jsonl files output by hadoop, one file  
+                    path per line. (e.g.: toPost.txt)
+    OVERWRITE       - Optional. The literal string 'OVERWRITE' (without quotes). If present, the script 
+                    will delete previous entries of the same image rather than preserving the older one.
+    """)
+
+
 
 def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT, OVERWRITE):
     OUT_TMP="/tmp/file.jsonl"
@@ -90,6 +117,9 @@ def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT, OVERWRI
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 5:
+        usage()
+        sys.exit()
     SOLR_HOST=sys.argv[1] #e.g. solr host to post documents
     SOLR_PORT=int(sys.argv[2]) #e.g. solr post
     SOLR_COLLECTION=sys.argv[3] #e.g. images: Solr collection name
