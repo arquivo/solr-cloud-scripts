@@ -28,13 +28,13 @@ URL_SPLIT_PATTERN = "[^\w\s\b]+";
 # Run inside a screen as this scirpt takes about 30-40 min per 10000000 documents posted
 #
 
-def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT):
+def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT, OVERWRITE):
     OUT_TMP="/tmp/file.jsonl"
     
 
     os.makedirs("log", exist_ok=True)
 
-    logging.info("START,{}".format(time.time()))
+    logging.info("START,{},{},{},{},{},{}".format(time.time(), SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT, OVERWRITE))
 
     response = requests.get("http://{}:{}/solr/{}/select/?q=*:*".format(SOLR_HOST, SOLR_PORT, SOLR_COLLECTION))
     oresp = response.json()
@@ -72,7 +72,7 @@ def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT):
             if tmp_file_len == POST_LIMIT:
               out.close()
               logging.info("POST,RUNNING,{}".format(tmp_file_len))
-              subprocess.run("{} -Dparams=overwrite=false -host {} -c {} {}".format(SOLR_BIN, SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
+              subprocess.run("{} -Dparams=overwrite={} -host {} -c {} {}".format(SOLR_BIN, str(OVERWRITE).lower(), SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
               out = open(OUT_TMP, "w")
               tmp_file_len = 0
       #last file of the collection
@@ -80,13 +80,13 @@ def post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT):
       if "part-r-00149" in COLLECTION_FILE:
         out.close()
         logging.info("POST,RUNNING,{}".format(tmp_file_len))
-        subprocess.run("{} -Dparams=overwrite=false -host {} -c {} {}".format(SOLR_BIN, SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
+        subprocess.run("{} -Dparams=overwrite={} -host {} -c {} {}".format(SOLR_BIN, str(OVERWRITE).lower(), SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
         out = open(OUT_TMP, "w")
         tmp_file_len = 0      
       COLLECTION_FILE_I += 1
     out.close()
     logging.info("POST,RUNNING,{}".format(tmp_file_len))
-    subprocess.run("{} -Dparams=overwrite=false -host {} -c {} {}".format(SOLR_BIN, SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
+    subprocess.run("{} -Dparams=overwrite={} -host {} -c {} {}".format(SOLR_BIN, str(OVERWRITE).lower(), SOLR_HOST, SOLR_COLLECTION, OUT_TMP).split(" "))
 
 
 if __name__ == "__main__":
@@ -94,5 +94,9 @@ if __name__ == "__main__":
     SOLR_PORT=int(sys.argv[2]) #e.g. solr post
     SOLR_COLLECTION=sys.argv[3] #e.g. images: Solr collection name
     COLLECTION_LIST=sys.argv[4] #e.g. text file with a list of jsonl files to post (one per line). jsonl files that match a collection must be together
-    post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT)
+    OVERWRITE=False
+    if len(sys.argv) > 5:
+      OVERWRITE=(sys.argv[5].lower()=="overwrite") #USE WITH CARE: overwrite existing records if "overwrite" is passed as the fifth arg
+
+    post_and_log(SOLR_COLLECTION, COLLECTION_LIST, SOLR_HOST, SOLR_PORT, OVERWRITE)
 
