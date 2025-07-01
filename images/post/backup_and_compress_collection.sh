@@ -1,6 +1,10 @@
 #! /bin/bash
 PROGNAME=$0
 
+# Path towards hadoop output folder & backup folder. Edit this if needed.
+HADOOP_FOLDER=/data/images/pipe # Where half of the JSONLs are on each server (output from hadoop + NSFW classifier)
+BACKUP_FOLDER=/data/images/to_backup/pipe # Where the backup is stored
+
 usage() {
   cat << EOF >&2
 Usage: $PROGNAME -C <collection> -S <other server> [-bcsd]
@@ -48,9 +52,6 @@ check() {
 
 backup() {
   echo "[BACKUP] - Starting backup step"
-
-  HADOOP_FOLDER=/data/images/pipe # Where half of the JSONLs are on each server (output from hadoop + NSFW classifier)
-  BACKUP_FOLDER=/data/images/to_backup/pipe # Where the backup is stored
 
   if [ ! -e $HADOOP_FOLDER/$COLLECTION ]; then
     echo "ERROR - $HADOOP_FOLDER/$COLLECTION : No such directory"
