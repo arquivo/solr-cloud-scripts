@@ -47,6 +47,8 @@ check() {
 }
 
 backup() {
+  echo "[BACKUP] - Starting backup step"
+
   HADOOP_FOLDER=/data/images/pipe # Where half of the JSONLs are on each server (output from hadoop + NSFW classifier)
   BACKUP_FOLDER=/data/images/to_backup/pipe # Where the backup is stored
 
@@ -60,14 +62,14 @@ backup() {
     exit 1
   fi
 
-  echo "Copying $COLLECTION to backups folder..."
+  echo "[BACKUP] - Copying $COLLECTION to backups folder..."
   mkdir $BACKUP_FOLDER/$COLLECTION
 
   # Moving local files to backup folder:
   find $HADOOP_FOLDER/$COLLECTION -mindepth 1 -maxdepth 1 -type d | rev | cut -d/ -f1 | rev | xargs -I {} mkdir $BACKUP_FOLDER/$COLLECTION/{}
   find $HADOOP_FOLDER/$COLLECTION -type f -name *.jsonl | rev | cut -d/ -f1-2 | rev | xargs -I {} cp $HADOOP_FOLDER/$COLLECTION/{} $BACKUP_FOLDER/$COLLECTION/{}
 
-  echo "Checking that everything was copied..."
+  echo "[BACKUP] - Checking that everything was copied..."
 
   INTEGRITY=$( (find $BACKUP_FOLDER/$COLLECTION -type f -name "*.jsonl" | rev | cut -d / -f 1-2 && find $HADOOP_FOLDER/$COLLECTION -type f -name "*.jsonl" | rev | cut -d / -f 1-2) | sort | uniq -u | rev )
 
@@ -82,7 +84,7 @@ backup() {
   STEP=$(find $HADOOP_FOLDER/$COLLECTION -type f -name "*.jsonl" | rev | cut -d - -f1 | rev | cut -d _ -f1 | sort -r | head -n2 | tr '\n' '-' | cut -d - -f1-2 | bc)
 
   if [ "$STEP" -gt 1 ]; then
-    echo "Missing half of the JSONL files! Fetching from $OTHER_SERVER... "
+    echo "[BACKUP] - Missing half of the JSONL files! Fetching from $OTHER_SERVER... "
     LOCAL_JSONL_COUNT=$(find $HADOOP_FOLDER/$COLLECTION -type f -name "*.jsonl" | wc -l)
     find $HADOOP_FOLDER/$COLLECTION -mindepth 1 -maxdepth 1 -type d | rev | cut -d/ -f1 | rev | xargs -I {} scp -q "root@$OTHER_SERVER:$HADOOP_FOLDER/$COLLECTION/{}/*.jsonl" $BACKUP_FOLDER/$COLLECTION/{}
 
@@ -102,11 +104,12 @@ backup() {
       exit 1
     fi
 
-    echo "Files copied successfully!"
+    echo "[BACKUP] - Files copied successfully!"
   fi
 }
 
 compress() {
+  echo "[COMPRESS] - Starting compress step"
   BACKUP_FOLDER=/data/images/to_backup/pipe # Where the backup is stored
   INPUT_FOLDER=$(bash -c "find $BACKUP_FOLDER -mindepth 1 -maxdepth 1 -type d && echo $BACKUP_FOLDER/$COLLECTION" | sort | uniq -d)
 
@@ -124,13 +127,13 @@ compress() {
     exit 1
   fi
 
-  echo "Found the following folders to compress on $INPUT_FOLDER:"
+  echo "[COMPRESS] - Found the following folders to compress on $INPUT_FOLDER:"
   echo "$FOLDERS_TO_COMPRESS"
 
-  echo "Compressing..."
+  echo "[COMPRESS] - Compressing..."
   find . -mindepth 1 -maxdepth 1 -type d | cut -d '/' -f 2- | xargs -I {} bash -c "tar cf - {} | pigz -9 -p 32 > {}.tar.gz"
 
-  echo "Checking that compression was successful..."
+  echo "[COMPRESS] - Checking that compression was successful..."
 
   INTEGRITY=$(find . -mindepth 1 -maxdepth 1 -type d | cut -d '/' -f 2- | xargs -I {} bash -c "find {}/ && pigz -dc -p 32 {}.tar.gz | tar -tf -" | sort | uniq -u)
 
@@ -140,18 +143,19 @@ compress() {
     exit 1
   fi
 
-  echo "Compression successful! Removing original uncompressed files..."
+  echo "[COMPRESS] - Compression successful! Removing original uncompressed files..."
 
   find . -mindepth 1 -maxdepth 1 -type d | xargs rm -rf
 
-  echo "Compression finished!"
+  echo "[COMPRESS] - Compression finished!"
 
 }
 
 sync() {
+  echo "[SYNC] - Starting synchronization step"
   BACKUP_FOLDER=/data/images/to_backup/pipe # Where the backup is stored
 
-  echo "Copying backup to $OTHER_SERVER..."
+  echo "[SYNC] - Copying backup to $OTHER_SERVER..."
   scp -r $BACKUP_FOLDER/$COLLECTION $OTHER_SERVER:$BACKUP_FOLDER/
 
   if [ ! $? -eq 0 ]; then
@@ -163,14 +167,15 @@ sync() {
     exit 1
   fi
 
-  echo "Files copied successfully!"
+  echo "[SYNC] - Files copied successfully!"
 
 }
 
-unset -v COLLECTION
-unset -v OTHER_SERVER
 
-cleanup() {
+# This is the delete step, it used to be called cleanup but was renamed because c was already used for the compress flag.
+# I was lazy and didn't rename the variables & functions accordingly ¯\_(ツ)_/¯
+cleanup() { 
+  echo "[DELETE] - Starting delete step"
 
   INPUT_FOLDER=$(bash -c "find $BACKUP_FOLDER -mindepth 1 -maxdepth 1 -type d && echo $BACKUP_FOLDER/$COLLECTION" | sort | uniq -d)
 
@@ -179,17 +184,22 @@ cleanup() {
     exit 5
   fi
 
-  echo "Deleting original local files..."
+  echo "[DELETE] - Deleting original local files..."
   rm -rf $HADOOP_FOLDER/$COLLECTION
 
+
+  echo "[DELETE] - Deleting original remote files..."
   ssh $OTHER_SERVER "rm -rf $HADOOP_FOLDER/$COLLECTION"
   if [ ! $? -eq 0 ]; then
     echo "Something went wrong. Retrying..."
     ssh $OTHER_SERVER "rm -rf $HADOOP_FOLDER/$COLLECTION"
   fi
 
-  echo "Done!"
+  echo "[DELETE] - Done!"
 }
+
+unset -v COLLECTION
+unset -v OTHER_SERVER
 
 BACKUP=true
 COMPRESS=true
@@ -254,19 +264,13 @@ if $BACKUP; then
   backup
 fi
 
-# Backup finished! Starting compression
-
 if $COMPRESS; then
   compress
 fi
 
-# Compression over, sending to the other server:
-
 if $SYNC; then
   sync
 fi
-
-# After both servers have the backups, we can cleanup the uncompressed files:
 
 if $CLEANUP; then
   cleanup
